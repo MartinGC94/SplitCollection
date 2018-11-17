@@ -9,7 +9,7 @@ namespace SplitCollection
 
     public sealed class SplitCollectionCommand : PSCmdlet
     {
-        bool usePipeline = false;
+        bool inputFromPipeline = false;
         List<object> pipelineOutputList = new List<object>();
 
         #region parameters
@@ -32,7 +32,7 @@ namespace SplitCollection
         {
             if (MyInvocation.ExpectingInput == true)
             {
-                usePipeline = true;
+                inputFromPipeline = true;
                 if (AmountOfParts > 0)
                 {
                     WriteWarning("When the \"AmountOfParts\" parameter is used inside a pipeline the rest of the pipeline is paused until all input data has been processed.");
@@ -42,7 +42,7 @@ namespace SplitCollection
         /// <summary>Handles any pipeline input</summary>
         protected override void ProcessRecord()
         {
-            if (usePipeline == true && ChunkSize > 0)
+            if (inputFromPipeline == true)
             {
                 pipelineOutputList.Add(InputObject[0]);
                 if (pipelineOutputList.Count == ChunkSize)
@@ -50,10 +50,6 @@ namespace SplitCollection
                     WriteObject(pipelineOutputList.ToArray());
                     pipelineOutputList.Clear();
                 }
-            }
-            else if (usePipeline == true && AmountOfParts > 0)
-            {
-                pipelineOutputList.Add(InputObject[0]);
             }
         }
         /// <summary>Outputs any remaining pipeline input, and handles the splitting for non pipeline input</summary>
@@ -68,10 +64,10 @@ namespace SplitCollection
                 else
                 {
                     InputObject = pipelineOutputList.ToArray();
-                    usePipeline = false;
+                    inputFromPipeline = false;
                 }
             }
-            if (usePipeline == false)
+            if (inputFromPipeline == false)
             {
                 Int32 InputObjectCount = InputObject.Length;
                 Int32 SizeOfFinalChunk = 0;
