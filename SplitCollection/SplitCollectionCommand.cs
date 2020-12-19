@@ -6,11 +6,12 @@ namespace SplitCollection
 {
     /// <summary>Splits the input collection into smaller arrays.</summary>
     [Cmdlet(VerbsCommon.Split, "Collection")]
+    [OutputType(typeof(object[]))]
 
     public sealed class SplitCollectionCommand : PSCmdlet
     {
-        bool inputFromPipeline = false;
-        List<object> pipelineOutputList = new List<object>();
+        private bool _InputFromPipeline = false;
+        private readonly List<object> _PipelineOutputList = new List<object>();
 
         #region parameters
         /// <summary>The input collection.</summary>
@@ -30,104 +31,98 @@ namespace SplitCollection
 
         protected override void BeginProcessing()
         {
-            if (MyInvocation.ExpectingInput == true)
-            {
-                inputFromPipeline = true;
-                if (AmountOfParts > 0)
-                {
-                    WriteWarning("When the \"AmountOfParts\" parameter is used inside a pipeline the rest of the pipeline is paused until all input data has been processed.");
-                }
-            }
+            _InputFromPipeline = MyInvocation.ExpectingInput;
         }
         /// <summary>Handles any pipeline input</summary>
         protected override void ProcessRecord()
         {
-            if (inputFromPipeline == true)
+            if (_InputFromPipeline == true)
             {
-                pipelineOutputList.Add(InputObject[0]);
-                if (pipelineOutputList.Count == ChunkSize)
+                _PipelineOutputList.Add(InputObject[0]);
+                if (_PipelineOutputList.Count == ChunkSize)
                 {
-                    WriteObject(pipelineOutputList.ToArray());
-                    pipelineOutputList.Clear();
+                    WriteObject(_PipelineOutputList.ToArray());
+                    _PipelineOutputList.Clear();
                 }
             }
         }
         /// <summary>Outputs any remaining pipeline input, and handles the splitting for non pipeline input</summary>
         protected override void EndProcessing()
         {
-            if (pipelineOutputList.Count > 0)
+            if (_PipelineOutputList.Count > 0)
             {
                 if (ChunkSize > 0)
                 {
-                    WriteObject(pipelineOutputList.ToArray());
+                    WriteObject(_PipelineOutputList.ToArray());
                 }
                 else
                 {
-                    InputObject = pipelineOutputList.ToArray();
-                    inputFromPipeline = false;
+                    InputObject = _PipelineOutputList.ToArray();
+                    _InputFromPipeline = false;
                 }
             }
-            if (inputFromPipeline == false)
+            if (_InputFromPipeline == false)
             {
-                Int32 InputObjectCount = InputObject.Length;
-                Int32 SizeOfFinalChunk = 0;
+                int inputObjectCount = InputObject.Length;
+                int sizeOfFinalChunk = 0;
 
                 /// <summary>Finds the optimal chunksize based on the requested amount of parts, and if there is an uneven amount, the size of the final chunk.</summary>
                 if (AmountOfParts > 0)
                 {
-                    if (AmountOfParts > InputObjectCount)
+                    if (AmountOfParts > inputObjectCount)
                     {
                         WriteWarning("The desired amount of parts is higher than the amount of objects in the collection.");
                     }
-                    Double ChunkSizeBeforeRounding = (Convert.ToDouble(InputObjectCount) / Convert.ToDouble(AmountOfParts));
-                    if ((int)ChunkSizeBeforeRounding == ChunkSizeBeforeRounding)
+
+                    double chunkSizeBeforeRounding = (double)inputObjectCount / AmountOfParts;
+                    if (chunkSizeBeforeRounding % 1 == 0)
                     {
-                        ChunkSize = Convert.ToInt32(ChunkSizeBeforeRounding);
+                        ChunkSize = (int)chunkSizeBeforeRounding;
                     }
                     else
                     {
-                        Double ChunkSizeCeiling = Math.Ceiling(ChunkSizeBeforeRounding);
+                        double chunkSizeCeiling = Math.Ceiling(chunkSizeBeforeRounding);
                         //If we round up, are there enough objects for 1 last chunk?
-                        if (ChunkSizeCeiling * (AmountOfParts - 1) < InputObjectCount)
+                        if (chunkSizeBeforeRounding < 1 || chunkSizeCeiling * (AmountOfParts - 1) < inputObjectCount)
                         {
-                            ChunkSize = Convert.ToInt32(ChunkSizeCeiling);
+                            ChunkSize = (int)chunkSizeCeiling;
                         }
                         else
                         {
-                            Double ChunkSizeFloor = Math.Floor(ChunkSizeBeforeRounding);
-                            ChunkSize = Convert.ToInt32(ChunkSizeFloor);
+                            double ChunkSizeFloor = Math.Floor(chunkSizeBeforeRounding);
+                            ChunkSize = (int)ChunkSizeFloor;
                         }
-                        SizeOfFinalChunk = InputObjectCount - (ChunkSize * (AmountOfParts - 1));
+                        sizeOfFinalChunk = inputObjectCount - (ChunkSize * (AmountOfParts - 1));
                     }
                 }
 
-                if (ChunkSize > InputObjectCount)
+                if (ChunkSize > inputObjectCount)
                 {
                     WriteWarning("The chunksize is higher than the amount of objects in the collection.");
                 }
                 /// <summary>Splits the inputobject into smaller chunks and writes them to the pipeline.</summary>
-                Int32 Skip = 0;
-                while (Skip < InputObjectCount)
+                int skip = 0;
+                object[] tempArray;
+                while (skip < inputObjectCount)
                 {
                     //Is the size of the final chunk special, and is this the final chunk?
-                    if (SizeOfFinalChunk > 0 && InputObjectCount == Skip + SizeOfFinalChunk)
+                    if (sizeOfFinalChunk > 0 && inputObjectCount == skip + sizeOfFinalChunk)
                     {
-                        ChunkSize = SizeOfFinalChunk;
+                        ChunkSize = sizeOfFinalChunk;
                     }
                     //Are there enough objects to fill up a full chunk?
-                    if (InputObjectCount >= Skip + ChunkSize)
+                    if (inputObjectCount >= skip + ChunkSize)
                     {
-                        Array TempArray = Array.CreateInstance(typeof(object), ChunkSize);
-                        Array.Copy(InputObject, Skip, TempArray, 0, ChunkSize);
-                        WriteObject(TempArray);
+                        tempArray = new object[ChunkSize];
+                        Array.Copy(InputObject, skip, tempArray, 0, ChunkSize);
                     }
                     else
                     {
-                        Array TempArray = Array.CreateInstance(typeof(object), InputObjectCount - Skip);
-                        Array.Copy(InputObject, Skip, TempArray, 0, InputObjectCount - Skip);
-                        WriteObject(TempArray);
+                        tempArray = new object[inputObjectCount - skip];
+                        Array.Copy(InputObject, skip, tempArray, 0, inputObjectCount - skip);
                     }
-                    Skip += ChunkSize;
+                    WriteObject(tempArray);
+                    skip += ChunkSize;
                 }
             }
         }
