@@ -5,7 +5,7 @@ using System.Management.Automation;
 namespace SplitCollection
 {
     /// <summary>Splits the input collection into smaller arrays.</summary>
-    [Cmdlet(VerbsCommon.Split, "Collection")]
+    [Cmdlet(VerbsCommon.Split, "Collection", DefaultParameterSetName = "SplitByChunkSize")]
     [OutputType(typeof(object[]))]
 
     public sealed class SplitCollectionCommand : PSCmdlet
@@ -19,12 +19,12 @@ namespace SplitCollection
         public object[] InputObject { get; set; }
 
         /// <summary>The size of each array chunk.</summary>
-        [Parameter(ParameterSetName = "SplitByChunkSize")]
+        [Parameter(Mandatory = true,ParameterSetName = "SplitByChunkSize")]
         [ValidateRange(1, int.MaxValue)]
         public int ChunkSize { get; set; }
 
         /// <summary>The amount of parts to split to split the input object into.</summary>
-        [Parameter(ParameterSetName = "SplitByAmountOfParts")]
+        [Parameter(Mandatory = true, ParameterSetName = "SplitByAmountOfParts")]
         [ValidateRange(1, int.MaxValue)]
         public int AmountOfParts { get; set; }
         #endregion
